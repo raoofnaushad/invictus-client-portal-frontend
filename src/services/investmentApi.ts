@@ -291,7 +291,7 @@ export class InvestmentApiService {
   static async getInvestmentAccount(id: string): Promise<InvestmentAccount | null> {
     try {
       // Try to fetch from real API first
-      const response = await fetch('http://localhost:9002/api/v1/portfolios/all/accounts', {
+      const response = await fetch('http://localhost:9002/api/v1/portfolios/all/investment-accounts', {
         headers: this.getAuthHeaders()
       });
       if (response.ok) {

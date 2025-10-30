@@ -21,50 +21,9 @@ import {
   HardDrive
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Area, AreaChart } from 'recharts';
-
-// Mock data with status toggle functionality
-const mockAccounts = [
-  {
-    id: 1,
-    name: "Investment BCA",
-    bankName: "Bank Central Asia",
-    type: "Depository",
-    subType: "money market",
-    linkedDate: "03/04/2025",
-    status: "Active",
-    balance: 122500
-  },
-  {
-    id: 2,
-    name: "Investment ABC",
-    bankName: "ABC Bank",
-    type: "Credit",
-    subType: "Paypal",
-    linkedDate: "29/03/2025",
-    status: "Inactive",
-    balance: 11975500
-  },
-  {
-    id: 3,
-    name: "Bank xyz",
-    bankName: "XYZ Bank",
-    type: "Investment",
-    subType: "401k",
-    linkedDate: "10/03/2025",
-    status: "Inactive",
-    balance: 9945000
-  },
-  {
-    id: 4,
-    name: "Bank abc",
-    bankName: "ABC Bank",
-    type: "Other",
-    subType: "Other",
-    linkedDate: "18/02/2025",
-    status: "Active",
-    balance: 153120675
-  }
-];
+import { BankAccount } from '@/types/bankAccount';
+import { InvestmentAccount } from '@/types/investmentAccount';
+import { LiabilityAccount } from '@/types/liabilityAccount';
 
 const chartData = [
   { month: 'January', value: 200000000 },
@@ -75,21 +34,109 @@ const chartData = [
   { month: 'June', value: 875000000 }
 ];
 
+interface LinkedAccount {
+  id: string;
+  name: string;
+  bankName: string;
+  type: string;
+  subType: string;
+  linkedDate: string;
+  status: "Active" | "Inactive";
+  balance: number;
+}
+
 const IntegrationSettingsPage = () => {
   const [activeTab, setActiveTab] = useState("financial");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [accounts, setAccounts] = useState(mockAccounts);
-  const [filteredAccounts, setFilteredAccounts] = useState(mockAccounts);
+  const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
+  const [filteredAccounts, setFilteredAccounts] = useState<LinkedAccount[]>([]);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  // Fetch accounts from all endpoints
+  const fetchAllAccounts = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      };
+
+      const [bankResponse, investmentResponse, liabilityResponse] = await Promise.all([
+        fetch('http://localhost:9002/api/v1/portfolios/all/accounts', { headers }),
+        fetch('http://localhost:9002/api/v1/portfolios/all/investment-accounts', { headers }),
+        fetch('http://localhost:9002/api/v1/portfolios/all/liabilities', { headers })
+      ]);
+
+      const bankAccounts: BankAccount[] = bankResponse.ok ? await bankResponse.json() : [];
+      const investmentAccounts: InvestmentAccount[] = investmentResponse.ok ? await investmentResponse.json() : [];
+      const liabilityAccounts: LiabilityAccount[] = liabilityResponse.ok ? await liabilityResponse.json() : [];
+
+      // Transform and combine all accounts
+      const allAccounts: LinkedAccount[] = [
+        ...bankAccounts.map(acc => ({
+          id: acc.id,
+          name: acc.name,
+          bankName: acc.financialInstitution,
+          type: 'Depository',
+          subType: acc.assetSubclass,
+          linkedDate: acc.createdAt ? new Date(acc.createdAt).toLocaleDateString('en-GB') : 'N/A',
+          status: 'Active' as const,
+          balance: acc.balance
+        })),
+        ...investmentAccounts.map(acc => ({
+          id: acc.id,
+          name: acc.name,
+          bankName: acc.financialInstitution,
+          type: 'Investment',
+          subType: acc.assetSubclass,
+          linkedDate: acc.createdAt ? new Date(acc.createdAt).toLocaleDateString('en-GB') : 'N/A',
+          status: 'Active' as const,
+          balance: acc.balance
+        })),
+        ...liabilityAccounts.map(acc => ({
+          id: acc.id,
+          name: acc.name,
+          bankName: acc.financialInstitution,
+          type: acc.assetClass === 'credit' ? 'Credit' : 'Loan',
+          subType: acc.assetSubclass,
+          linkedDate: acc.createdAt ? new Date(acc.createdAt).toLocaleDateString('en-GB') : 'N/A',
+          status: 'Active' as const,
+          balance: acc.balance
+        }))
+      ];
+
+      setAccounts(allAccounts);
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch accounts. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load accounts on mount
+  useEffect(() => {
+    fetchAllAccounts();
+  }, []);
 
   // Calculate totals
   const totalImportedAssets = accounts.reduce((sum, account) => sum + account.balance, 0);
   const totalAccounts = accounts.length;
   const activeAccounts = accounts.filter(acc => acc.status === "Active").length;
   const totalTransactions = 110;
-  const lastImportDate = "03/04/2025";
+  const lastImportDate = accounts.length > 0 
+    ? accounts.reduce((latest, acc) => {
+        return acc.linkedDate > latest ? acc.linkedDate : latest;
+      }, accounts[0].linkedDate)
+    : "N/A";
 
   useEffect(() => {
     let filtered = accounts;
@@ -125,11 +172,11 @@ const IntegrationSettingsPage = () => {
     return formatCurrency(num);
   };
 
-  const handleStatusToggle = (accountId: number) => {
+  const handleStatusToggle = (accountId: string) => {
     setAccounts(prevAccounts => 
       prevAccounts.map(account => 
         account.id === accountId 
-          ? { ...account, status: account.status === "Active" ? "Inactive" : "Active" }
+          ? { ...account, status: account.status === "Active" ? "Inactive" : "Active" as const }
           : account
       )
     );
@@ -140,27 +187,16 @@ const IntegrationSettingsPage = () => {
     });
   };
 
-  const handleLinkSuccess = (publicToken: string, product: string, metadata: any) => {
+  const handleLinkSuccess = async (publicToken: string, product: string, metadata: unknown) => {
     console.log('Success!', publicToken, product, metadata);
-    
-    // Add new mock account
-    const newAccount = {
-      id: Date.now(),
-      name: `New ${product} Account`,
-      bankName: metadata.institution?.name || "New Bank",
-      type: product,
-      subType: "linked",
-      linkedDate: new Date().toLocaleDateString('en-GB'),
-      status: "Active",
-      balance: Math.floor(Math.random() * 1000000)
-    };
-    
-    setAccounts(prev => [...prev, newAccount]);
     
     toast({
       title: "Account Linked Successfully",
-      description: "Your new account has been successfully linked.",
+      description: "Refreshing accounts...",
     });
+
+    // Refresh accounts after successful link
+    await fetchAllAccounts();
   };
 
   const tableColumns = [
@@ -322,33 +358,48 @@ const IntegrationSettingsPage = () => {
                   </div>
                 </div>
 
-                <StandardTable columns={tableColumns}>
-                  {filteredAccounts.map((account) => (
-                    <TableRow key={account.id}>
-                      <TableCell className="font-medium">{account.name}</TableCell>
-                      <TableCell>{account.bankName}</TableCell>
-                      <TableCell>{account.type}</TableCell>
-                      <TableCell>{account.subType}</TableCell>
-                      <TableCell>{account.linkedDate}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleStatusToggle(account.id)}
-                            className={`w-9 h-5 rounded-full flex items-center px-1 cursor-pointer transition-colors ${
-                              account.status === 'Active' ? 'bg-green-100 hover:bg-green-200' : 'bg-gray-100 hover:bg-gray-200'
-                            }`}
-                          >
-                            <div className={`w-3 h-3 rounded-full transition-transform ${
-                              account.status === 'Active' ? 'bg-green-500 translate-x-4' : 'bg-gray-400'
-                            }`} />
-                          </button>
-                          <span className="text-sm">{account.status}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{formatCurrency(account.balance)}</TableCell>
-                    </TableRow>
-                  ))}
-                </StandardTable>
+                {loading ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-600">Loading accounts...</p>
+                  </div>
+                ) : filteredAccounts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Building2 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Accounts Linked</h3>
+                    <p className="text-gray-600 mb-4">Connect your financial accounts to get started.</p>
+                    <Button onClick={() => setIsLinkModalOpen(true)}>
+                      Link Your First Account
+                    </Button>
+                  </div>
+                ) : (
+                  <StandardTable columns={tableColumns}>
+                    {filteredAccounts.map((account) => (
+                      <TableRow key={account.id}>
+                        <TableCell className="font-medium">{account.name}</TableCell>
+                        <TableCell>{account.bankName}</TableCell>
+                        <TableCell>{account.type}</TableCell>
+                        <TableCell>{account.subType}</TableCell>
+                        <TableCell>{account.linkedDate}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleStatusToggle(account.id)}
+                              className={`w-9 h-5 rounded-full flex items-center px-1 cursor-pointer transition-colors ${
+                                account.status === 'Active' ? 'bg-green-100 hover:bg-green-200' : 'bg-gray-100 hover:bg-gray-200'
+                              }`}
+                            >
+                              <div className={`w-3 h-3 rounded-full transition-transform ${
+                                account.status === 'Active' ? 'bg-green-500 translate-x-4' : 'bg-gray-400'
+                              }`} />
+                            </button>
+                            <span className="text-sm">{account.status}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(account.balance)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </StandardTable>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

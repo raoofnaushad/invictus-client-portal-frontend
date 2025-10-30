@@ -13,7 +13,7 @@ import { bankAccountApi } from "@/services/bankAccountApi";
 import { mockBankAccountApi } from "@/services/mockBankAccountApi";
 
 // Use mock API in development
-const isDevelopment = import.meta.env.DEV;
+const isDevelopment = import.meta.env.DEV1;
 const api = isDevelopment ? mockBankAccountApi : bankAccountApi;
 
 export default function BankAccountsPage() {
@@ -41,7 +41,7 @@ export default function BankAccountsPage() {
       console.log('API not available, using mock data');
       const allFilters = searchTerm ? { ...filters, searchTerm } : filters;
       
-      const response = await mockBankAccountApi.getBankAccounts(
+      const response = await api.getBankAccounts(
         { page: currentPage, limit: itemsPerPage },
         allFilters
       );

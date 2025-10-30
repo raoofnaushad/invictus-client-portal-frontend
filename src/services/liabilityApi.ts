@@ -336,8 +336,22 @@ export class LiabilityApiService {
   }
 
   static async getLiability(id: string): Promise<LiabilityAccount | null> {
-    await delay(200);
-    return mockLiabilities.find(liability => liability.id === id) || null;
+    try {
+      const response = await fetch('http://localhost:9002/api/v1/portfolios/all/liabilities', {
+        headers: this.getAuthHeaders()
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch liabilities');
+      }
+      
+      const accounts: LiabilityAccount[] = await response.json();
+      return accounts.find(liability => liability.id === id) || null;
+    } catch (error) {
+      console.error('Error fetching liability from API, using mock data:', error);
+      await delay(200);
+      return mockLiabilities.find(liability => liability.id === id) || null;
+    }
   }
 
   static async getFilterOptions(): Promise<{

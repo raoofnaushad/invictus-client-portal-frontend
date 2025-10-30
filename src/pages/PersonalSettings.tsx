@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { profileApi, ProfileResponse, ProfileApiError } from "@/services/profileApi";
+import { settingsApi, SettingsApiError } from "@/services/settingsApi";
 import { MfaSetupModal } from "@/components/mfa/MfaSetupModal";
 
 const PersonalSettings: React.FC = () => {
@@ -44,15 +45,16 @@ const PersonalSettings: React.FC = () => {
     
     setSaving(true);
     try {
-      const updatedProfile = await profileApi.updateProfile({
+      await settingsApi.updateSettings({
         fullName,
         phoneNumber,
+        organizationName: profile.alias,
+        email,
       });
-      setProfile(updatedProfile);
       toast.success('Profile updated successfully');
     } catch (error) {
       console.error('Error saving profile:', error);
-      if (error instanceof ProfileApiError) {
+      if (error instanceof SettingsApiError) {
         toast.error(error.message);
       } else {
         toast.error('Failed to save changes');
@@ -160,6 +162,7 @@ const PersonalSettings: React.FC = () => {
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
                 <Input
+                  disabled
                   id="email"
                   type="email"
                   value={email}

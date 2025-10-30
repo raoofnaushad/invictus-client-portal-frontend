@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { profileApi, ProfileResponse, ProfileApiError } from "@/services/profileApi";
+import { settingsApi, SettingsApiError } from "@/services/settingsApi";
 
 const AccountSettings: React.FC = () => {
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
@@ -52,14 +53,16 @@ const AccountSettings: React.FC = () => {
     
     setSaving(true);
     try {
-      const updatedProfile = await profileApi.updateProfile({
-        alias: orgName,
+      await settingsApi.updateSettings({
+        fullName: profile.userCredential.fullName,
+        phoneNumber: profile.userCredential.phoneNumber,
+        organizationName: orgName,
+        email: profile.userCredential.username,
       });
-      setProfile(updatedProfile);
       toast.success('Organization settings updated successfully');
     } catch (error) {
       console.error('Error saving settings:', error);
-      if (error instanceof ProfileApiError) {
+      if (error instanceof SettingsApiError) {
         toast.error(error.message);
       } else {
         toast.error('Failed to save settings');
@@ -147,7 +150,7 @@ const AccountSettings: React.FC = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="logo">Upload Logo</Label>
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center relative">
                   {logoPreview ? (
                     <div className="space-y-4">
                       <img 
@@ -170,7 +173,12 @@ const AccountSettings: React.FC = () => {
                     type="file"
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    className="sr-only"
+                  />
+                  <label 
+                    htmlFor="logo" 
+                    className="absolute inset-0 cursor-pointer"
+                    aria-label="Upload logo"
                   />
                 </div>
               </div>

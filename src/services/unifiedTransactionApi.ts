@@ -1,9 +1,12 @@
 import { UnifiedTransaction, UnifiedTransactionFilters } from "@/types/unifiedTransaction";
 import { InvestmentApiService, Transaction as InvestmentTransaction } from "./investmentApi";
 import { LiabilityApiService } from "./liabilityApi";
+import { bankAccountApi } from "./bankAccountApi";
+
 import { LiabilityDetail } from "@/types/liabilityAccount";
 import { mockTransactions } from "@/data/illiquidTransactionData";
 import { Transaction as IlliquidTransaction } from "@/data/illiquidTransactionData";
+import { BankTransaction } from "@/types/bankAccount";
 
 export interface PaginationParams {
   page: number;
@@ -31,6 +34,27 @@ const maskAccountNumber = (accountNumber: string): string => {
 // Convert investment transaction to unified format
 const convertInvestmentTransaction = (
   transaction: InvestmentTransaction,
+  accountNumber: string
+): UnifiedTransaction => {
+  return {
+    id: `inv_${transaction.id}`,
+    date: transaction.date,
+    amount: transaction.amount,
+    currency: 'USD',
+    direction: transaction.amount >= 0 ? 'Incoming' : 'Outgoing',
+    senderRecipient: transaction.description.includes('Dividend') ? 'Company Dividend' : 'Investment Broker',
+    description: transaction.description,
+    type: transaction.type === 'Buy' || transaction.type === 'Sell' ? transaction.type : 'Investment',
+    accountNo: maskAccountNumber(accountNumber),
+    source: 'Import',
+    accountType: 'Investment',
+    originalId: transaction.id
+  };
+};
+
+
+const convertBankTransaction = (
+  transaction: BankTransaction,
   accountNumber: string
 ): UnifiedTransaction => {
   return {
@@ -109,13 +133,21 @@ export class UnifiedTransactionApiService {
     let allTransactions: UnifiedTransaction[] = [];
 
     try {
+      const bankResponse = await bankAccountApi.getBankAccounts({ page: 1, limit: 100 });
+      for (const account of bankResponse.data) {
+        const bankTransactions = account.transactions.map(tr => 
+          convertBankTransaction(tr, account.accountNumber)
+        );
+        allTransactions.push(...bankTransactions);
+      }
+
       // Fetch investment transactions
       const investmentResponse = await InvestmentApiService.getTransactions(
         undefined, 
         { page: 1, limit: 1000 }
       );
       const investmentTransactions = investmentResponse.data.map(transaction => 
-        convertInvestmentTransaction(transaction, `INV12345`)
+        convertInvestmentTransaction(transaction, `INV12345transaction`)
       );
       allTransactions.push(...investmentTransactions);
 
@@ -129,12 +161,12 @@ export class UnifiedTransactionApiService {
       }
 
       // Fetch illiquid transactions
-      Object.entries(mockTransactions).forEach(([investmentId, transactions]) => {
+      /*Object.entries(mockTransactions).forEach(([investmentId, transactions]) => {
         const illiquidTransactions = transactions.map(transaction =>
           convertIlliquidTransaction(transaction, investmentId)
         );
         allTransactions.push(...illiquidTransactions);
-      });
+      });*/
 
     } catch (error) {
       console.error('Error fetching transactions:', error);

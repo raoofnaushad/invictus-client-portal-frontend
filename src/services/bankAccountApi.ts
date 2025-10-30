@@ -200,15 +200,22 @@ class BankAccountApiService {
 
   async getBankAccountById(id: string): Promise<BankAccount> {
     try {
-      const response = await fetch(`${this.baseUrl}/accounts/${id}`, {
+      const response = await fetch(`${this.baseUrl}/accounts`, {
         headers: this.getAuthHeaders()
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch bank account');
+        throw new Error('Failed to fetch bank accounts');
       }
 
-      return await response.json();
+      const accounts: BankAccount[] = await response.json();
+      const account = accounts.find(acc => acc.id === id);
+      
+      if (!account) {
+        throw new Error('Bank account not found');
+      }
+      
+      return account;
     } catch (error) {
       console.error('Error fetching bank account from API, using mock data:', error);
       const account = mockBankAccounts.find(acc => acc.id === id);

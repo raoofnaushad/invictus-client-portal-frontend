@@ -13,7 +13,7 @@ import { bankAccountApi } from "@/services/bankAccountApi";
 import { mockBankAccountApi } from "@/services/mockBankAccountApi";
 
 // Use mock API in development
-const isDevelopment = import.meta.env.DEV;
+const isDevelopment = import.meta.env.DEV1;
 const api = isDevelopment ? mockBankAccountApi : bankAccountApi;
 
 const transactionColumns = [
