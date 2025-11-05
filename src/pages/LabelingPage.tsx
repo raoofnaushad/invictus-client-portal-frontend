@@ -17,8 +17,9 @@ import { UnifiedDocumentApi } from "@/services/unifiedDocumentApi";
 const LabelingPage = () => {
   const [searchParams] = useSearchParams();
   const documentId = searchParams.get('documentId') || '1';
-  
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string>(searchParams.get('documentId') || '1');
+
+  // Initialize with documentId from URL instead of hardcoded "1"
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string>(documentId);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [approvalStatus, setApprovalStatus] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
@@ -119,6 +120,25 @@ const LabelingPage = () => {
       ...prev,
       [field]: value
     }));
+
+    // Update labelingData to sync the change
+    if (labelingData && labelingData.parse_data[currentPage]) {
+      const updatedParseData = [...labelingData.parse_data];
+      updatedParseData[currentPage] = {
+        ...updatedParseData[currentPage],
+        extracted_data: {
+          ...updatedParseData[currentPage].extracted_data,
+          [field]: {
+            ...updatedParseData[currentPage].extracted_data[field],
+            value: value
+          }
+        }
+      };
+      setLabelingData({
+        ...labelingData,
+        parse_data: updatedParseData
+      });
+    }
   };
 
   const handleTransactionUpdate = (id: number, field: string, value: string | boolean) => {
@@ -129,6 +149,38 @@ const LabelingPage = () => {
           : transaction
       )
     );
+
+    // Update labelingData to sync the change
+    if (labelingData && labelingData.parse_data[currentPage]) {
+      const transactionIndex = transactions.findIndex(t => t.id === id);
+      if (transactionIndex !== -1 && labelingData.parse_data[currentPage].extracted_data.transactions) {
+        const updatedParseData = [...labelingData.parse_data];
+        const currentTransactions = [...(updatedParseData[currentPage].extracted_data.transactions as ExtractedTransaction[])];
+        
+        if (currentTransactions[transactionIndex] && currentTransactions[transactionIndex][field]) {
+          currentTransactions[transactionIndex] = {
+            ...currentTransactions[transactionIndex],
+            [field]: {
+              ...currentTransactions[transactionIndex][field],
+              value: value
+            }
+          };
+          
+          updatedParseData[currentPage] = {
+            ...updatedParseData[currentPage],
+            extracted_data: {
+              ...updatedParseData[currentPage].extracted_data,
+              transactions: currentTransactions
+            }
+          };
+          
+          setLabelingData({
+            ...labelingData,
+            parse_data: updatedParseData
+          });
+        }
+      }
+    }
   };
 
   const [editLabelId, setEditLabelId] = useState<string | null>(null);
@@ -165,12 +217,12 @@ const LabelingPage = () => {
     if (!labelingData) return;
     
     try {
-      // Update document with current field values, transactions, and status
-      await UnifiedDocumentApi.updateDocument(selectedDocumentId, {
-        extractedData,
-        transactions,
-        status,
-        currentPage
+      // Update document with complete structure including all pages and approval status
+      await UnifiedDocumentApi.updateDocument(labelingData.documentId, {
+        extractedData: {
+          extracted_data: labelingData.parse_data
+        },
+        status
       });
       
       toast.success("Document updated successfully!");
@@ -219,23 +271,21 @@ const LabelingPage = () => {
     // Convert extracted fields to label format for display
     Object.entries(pageData.extracted_data).forEach(([key, field]) => {
       if (key === 'transactions') return; // Handle transactions separately
-      
+
       const fieldData = field as ExtractedField;
       // Show labels for all fields, including those with null values but valid bboxes
-      if (fieldData.bbox[0] !== null) {
-        // Convert absolute bbox to percentage coordinates for LabelStudio
+      // Add null safety check for fieldData and bbox array
+      if (fieldData && fieldData.bbox && Array.isArray(fieldData.bbox) && fieldData.bbox[0] !== null) {
+        // API returns normalized bbox (0-1 range), convert to percentage for display
         const [xmin, ymin, xmax, ymax] = fieldData.bbox as [number, number, number, number];
-        // Assuming image dimensions (you may need to adjust these)
-        const imageWidth = 1200;
-        const imageHeight = 1600;
         
         labels.push({
           id: `field-${key}`,
           text: fieldData.value || "-",
-          x: (xmin / imageWidth) * 100,
-          y: (ymin / imageHeight) * 100,
-          width: ((xmax - xmin) / imageWidth) * 100,
-          height: ((ymax - ymin) / imageHeight) * 100,
+          x: xmin * 100,
+          y: ymin * 100,
+          width: (xmax - xmin) * 100,
+          height: (ymax - ymin) * 100,
           field: key,
           color: getFieldColor(key)
         });
@@ -258,18 +308,18 @@ const LabelingPage = () => {
         Object.entries(transaction).forEach(([transField, transFieldData]) => {
           const fieldData = transFieldData as ExtractedField;
           // Show labels for all fields, including those with null values but valid bboxes
-          if (fieldData.bbox[0] !== null) {
+          // Add null safety check for fieldData and bbox array
+          if (fieldData && fieldData.bbox && Array.isArray(fieldData.bbox) && fieldData.bbox[0] !== null) {
+            // API returns normalized bbox (0-1 range), convert to percentage for display
             const [xmin, ymin, xmax, ymax] = fieldData.bbox as [number, number, number, number];
-            const imageWidth = 1200;
-            const imageHeight = 1600;
             
             labels.push({
               id: `transaction-${transactionIndex}-${transField}`,
               text: fieldData.value || "-",
-              x: (xmin / imageWidth) * 100,
-              y: (ymin / imageHeight) * 100,
-              width: ((xmax - xmin) / imageWidth) * 100,
-              height: ((ymax - ymin) / imageHeight) * 100,
+              x: xmin * 100,
+              y: ymin * 100,
+              width: (xmax - xmin) * 100,
+              height: (ymax - ymin) * 100,
               field: transField,
               color: getFieldColor(transField),
               itemIndex: transactionIndex
@@ -282,95 +332,86 @@ const LabelingPage = () => {
     return labels;
   }, [labelingData, currentPage]);
 
-  const handleDocumentLabelsChange = async (labels: any[]) => {
-    // Transform labels to the requested JSON format: {field_name, field_value, bbox}
-    const documentLabelsJson = labels.map(label => {
-      const imageWidth = 1200;
-      const imageHeight = 1600;
-      
-      // Convert percentage coordinates back to absolute
-      const xmin = Math.round((label.x / 100) * imageWidth);
-      const ymin = Math.round((label.y / 100) * imageHeight);
-      const xmax = Math.round(((label.x + label.width) / 100) * imageWidth);
-      const ymax = Math.round(((label.y + label.height) / 100) * imageHeight);
-      
-      return {
-        field_name: label.field || label.label,
-        field_value: label.text || label.ocr_text || "",
-        bbox: [xmin, ymin, xmax, ymax]
+  const handleDocumentLabelsChange = (labels: any[]) => {
+    if (!labelingData) return;
+
+    const currentPageData = labelingData.parse_data[currentPage];
+    if (!currentPageData) return;
+
+    // Update the current page's extracted_data with new label values
+    const updatedFields = labels.reduce((acc, label) => {
+      acc[label.field] = {
+        value: label.text,
+        bbox: [
+          label.x / 100,
+          label.y / 100,
+          (label.x + label.width) / 100,
+          (label.y + label.height) / 100
+        ],
+        confidence: currentPageData.extracted_data[label.field]?.confidence || 0.95
       };
-    });
-    
-    console.log("Document Labels JSON:", documentLabelsJson);
-    
-    // Update extracted data based on labels
-    const updatedExtractedData = { ...extractedData };
-    documentLabelsJson.forEach(labelData => {
-      const fieldName = labelData.field_name;
-      const textValue = labelData.field_value;
-      
-      if (textValue && textValue !== "Click to edit...") {
-        updatedExtractedData[fieldName] = textValue;
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Update the parse_data array with the modified page
+    const updatedParseData = [...labelingData.parse_data];
+    updatedParseData[currentPage] = {
+      ...currentPageData,
+      extracted_data: {
+        ...currentPageData.extracted_data,
+        ...updatedFields
       }
+    };
+
+    // Update local state only
+    setLabelingData({
+      ...labelingData,
+      parse_data: updatedParseData
     });
-    setExtractedData(updatedExtractedData);
-    
-    try {
-      await UnifiedDocumentApi.saveLabels(selectedDocumentId, currentPage, documentLabelsJson);
-    } catch (error) {
-      console.error("Failed to update document labels:", error);
-    }
   };
 
-  const handleLineItemLabelsChange = async (labels: any[]) => {
-    // Transform line item labels to the requested format
-    const lineItemsByTransaction: Record<number, any[]> = {};
-    labels.forEach(label => {
-      if (label.itemIndex !== undefined) {
-        if (!lineItemsByTransaction[label.itemIndex]) {
-          lineItemsByTransaction[label.itemIndex] = [];
-        }
-        
-        const imageWidth = 1200;
-        const imageHeight = 1600;
-        
-        // Convert percentage coordinates back to absolute
-        const xmin = Math.round((label.x / 100) * imageWidth);
-        const ymin = Math.round((label.y / 100) * imageHeight);
-        const xmax = Math.round(((label.x + label.width) / 100) * imageWidth);
-        const ymax = Math.round(((label.y + label.height) / 100) * imageHeight);
-        
-        lineItemsByTransaction[label.itemIndex].push({
-          field_name: label.field || label.label,
-          field_value: label.text || label.ocr_text || "",
-          bbox: [xmin, ymin, xmax, ymax]
-        });
-      }
-    });
-    
-    const lineItemsJson = Object.values(lineItemsByTransaction);
-    console.log("Line Items JSON:", lineItemsJson);
-    
-    // Update transactions based on line item labels
-    const updatedTransactions = [...transactions];
-    labels.forEach(label => {
-      const fieldName = label.field || label.label;
-      const textValue = label.text || label.ocr_text;
+  const handleLineItemLabelsChange = (labels: any[]) => {
+    if (!labelingData) return;
+
+    const currentPageData = labelingData.parse_data[currentPage];
+    if (!currentPageData) return;
+
+    // Group labels by itemIndex
+    const itemsByIndex = labels.reduce((acc, label) => {
+      const idx = label.itemIndex || 0;
+      if (!acc[idx]) acc[idx] = {};
       
-      if (textValue && textValue !== "Click to edit..." && label.itemIndex !== undefined) {
-        const transactionIndex = label.itemIndex;
-        if (updatedTransactions[transactionIndex]) {
-          updatedTransactions[transactionIndex][fieldName] = textValue;
-        }
+      acc[idx][label.field] = {
+        value: label.text,
+        bbox: [
+          label.x / 100,
+          label.y / 100,
+          (label.x + label.width) / 100,
+          (label.y + label.height) / 100
+        ],
+        confidence: 0.95
+      };
+      return acc;
+    }, {} as Record<number, any>);
+
+    // Convert to array format
+    const updatedTransactions = Object.values(itemsByIndex);
+
+    // Update the parse_data array with the modified page
+    const updatedParseData = [...labelingData.parse_data];
+    updatedParseData[currentPage] = {
+      ...currentPageData,
+      extracted_data: {
+        ...currentPageData.extracted_data,
+        transactions: updatedTransactions
       }
+    };
+
+    // Update local state only
+    setLabelingData({
+      ...labelingData,
+      parse_data: updatedParseData
     });
-    setTransactions(updatedTransactions);
-    
-    try {
-      await UnifiedDocumentApi.saveLabels(selectedDocumentId, currentPage, lineItemsJson);
-    } catch (error) {
-      console.error("Failed to update line item labels:", error);
-    }
   };
 
   const handleSaveSession = async () => {

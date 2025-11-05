@@ -4,11 +4,23 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, Trash2 } from "lucide-react";
+import { Download, Trash2, FileJson } from "lucide-react";
 import { Document } from "@/services/mockApi";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface DocumentTableProps {
   documents: Document[];
+  onDelete?: (documentId: string) => void;
 }
 
 const getStatusBadge = (status: string) => {
@@ -40,7 +52,20 @@ const columns = [
   { key: "actions", header: "Action" },
 ];
 
-export const DocumentTable = ({ documents }: DocumentTableProps) => {
+export const DocumentTable = ({ documents, onDelete }: DocumentTableProps) => {
+  const handleDownloadExtractedData = (doc: Document) => {
+    const extractedData = doc.extractedData;
+    const dataStr = JSON.stringify(extractedData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.download = `${doc.name || 'document'}_extracted_data.json`;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
   return (
     <StandardTable columns={columns}>
       {documents.map((document, index) => (
@@ -67,12 +92,15 @@ export const DocumentTable = ({ documents }: DocumentTableProps) => {
           <TableCell className="text-sm text-gray-600">{document.relatedTo}</TableCell>
           <TableCell className="text-sm text-gray-600">{document.assignedTo}</TableCell>
           <TableCell>
-            <Link 
-              to="/document-transactions" 
-              className="text-foreground hover:text-foreground underline text-sm"
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDownloadExtractedData(document)}
+              className="text-foreground hover:text-foreground underline text-sm p-0 h-auto"
             >
-              View
-            </Link>
+              <FileJson className="h-4 w-4 mr-1 inline" />
+              Download JSON
+            </Button>
           </TableCell>
           <TableCell>
             <div className="flex items-center space-x-1">
@@ -83,13 +111,34 @@ export const DocumentTable = ({ documents }: DocumentTableProps) => {
               >
                 <Download className="h-4 w-4" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={`p-1 h-8 w-8 ${(index + 1) % 2 === 0 ? 'bg-blue-50 hover:bg-blue-100' : 'bg-white hover:bg-gray-100'}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className={`p-1 h-8 w-8 text-destructive hover:text-destructive ${(index + 1) % 2 === 0 ? 'bg-blue-50 hover:bg-blue-100' : 'bg-white hover:bg-gray-100'}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Document</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete "{document.name}"? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={() => onDelete?.(document.id)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </TableCell>
         </TableRow>

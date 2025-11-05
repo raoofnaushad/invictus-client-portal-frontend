@@ -54,6 +54,8 @@ export const UnifiedLabelViewer = ({
     ...lineItemLabels.map(label => ({ ...label, type: "lineItem" as const, color: getFieldColor(label.field) }))
   ];
 
+  console.log("Rendering UnifiedLabelViewer with labels:", allLabels);
+
   const getRelativePosition = (e: React.MouseEvent) => {
     if (!imageRef.current) return { x: 0, y: 0 };
     
@@ -141,13 +143,13 @@ export const UnifiedLabelViewer = ({
   return (
     <div className="flex-1 flex items-center justify-center p-4 h-full bg-gray-50">
       <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full h-full overflow-hidden">
-        <div className="relative h-full">
+        <div className="relative">
           <img 
             ref={imageRef}
             src={imageUrl}
             alt="Financial Account Summary"
             className={cn(
-              "w-full h-full object-contain rounded-lg",
+              "object-contain rounded-lg",
               editingLabel && "cursor-crosshair"
             )}
             onMouseDown={handleMouseDown}

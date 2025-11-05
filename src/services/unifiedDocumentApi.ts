@@ -34,7 +34,7 @@ export const UnifiedDocumentApi = {
         day: '2-digit',
         year: 'numeric'
       }),
-      relatedTo: doc.documentType || 'Document',
+      relatedTo: doc.documentType || '-',
       assignedTo: 'User',
       type: doc.extractedData.category || 'Unknown'
     }));
@@ -99,17 +99,11 @@ export const UnifiedDocumentApi = {
     documentId: string,
     updateData: {
       extractedData?: Record<string, any>;
-      transactions?: any[];
       status?: string;
-      currentPage?: number;
     }
-  ): Promise<boolean> {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Mock: Updating document', documentId, updateData);
-      return Promise.resolve(true);
-    }
+  ): Promise<Document | null> {
+    console.log('Mock: Updating document', documentId, updateData);
 
-    // Production implementation would go here
-    return true;
+    return DocumentApiService.updateDocument(documentId, updateData);
   }
 };

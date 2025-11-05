@@ -131,9 +131,9 @@ export default function DocumentVault() {
           day: '2-digit',
           year: 'numeric'
         }),
-        type: doc.documentType || 'Document',
+        type: doc.documentType || '-',
         status: doc.documentStatus as any,
-        relatedTo: doc.extractedData.category || 'Document',
+        relatedTo: doc.extractedData.category || '-',
         assignedTo: 'User',
         extractedData: doc.extractedData
       }));
