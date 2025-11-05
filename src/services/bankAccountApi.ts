@@ -71,7 +71,7 @@ class BankAccountApiService {
   }
 
   async getBankAccounts(
-    pagination: PaginationParams,
+    pagination: PaginationParams,   
     filters?: BankAccountFilters
   ): Promise<PaginatedResponse<BankAccount>> {
     try {

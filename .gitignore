@@ -6,7 +6,6 @@ node_modules/
 # Production builds
 /dist
 /build
-*.tsbuildinfo
 
 # Environment variables
 .env
@@ -74,7 +73,6 @@ jspm_packages/
 
 # Nuxt.js build / generate output
 .nuxt
-dist
 
 # Storybook build outputs
 .out

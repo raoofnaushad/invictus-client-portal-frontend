@@ -190,6 +190,31 @@ export const DocumentApiService = {
     return await response.json();
   },
 
+  async updateDocument(documentId: string, updateData: {
+      extractedData?: Record<string, any>;
+      status?: string;
+    }): Promise<Document | null> {
+    
+    // Production API call
+    const response = await fetch(`${API_BASE_URL}/v1/documents/${documentId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({documentStatus: updateData.status, extractedData: updateData?.extractedData?.['extracted_data']  })
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Failed to fetch document: ${response.statusText}`);
+    }
+
+    return await response.json();
+  },
+
   async deleteDocument(documentId: string): Promise<void> {
     if (process.env.NODE_ENV === 'development') {
       // Mock delete

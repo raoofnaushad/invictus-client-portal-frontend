@@ -23,7 +23,7 @@ export const ApprovalSection = ({
   approvalStatus,
   assignedTo,
   priority,
-  documentStatus = "processing",
+  documentStatus = "Processing",
   selectedDocumentId,
   extractedData,
   transactions,
@@ -45,31 +45,12 @@ export const ApprovalSection = ({
     switch (value) {
       case "approved":
         statusMessage = "Document approved successfully!";
-        newDocumentStatus = "approved";
+        newDocumentStatus = "Approved";
         break;
       case "reject":
         statusMessage = "Document rejected";
-        newDocumentStatus = "rejected";
+        newDocumentStatus = "Rejected";
         break;
-      case "reconciled":
-        statusMessage = "Document marked as reconciled";
-        newDocumentStatus = "reconciled";
-        break;
-      case "not-reconciled":
-        statusMessage = "Document marked as not reconciled";
-        newDocumentStatus = "not-reconciled";
-        break;
-      case "move-next":
-        statusMessage = "Moving to next file";
-        newDocumentStatus = "approved";
-        break;
-      case "move-prev":
-        statusMessage = "Moving to previous stage";
-        newDocumentStatus = "pending";
-        break;
-      case "view-routing":
-        statusMessage = "Viewing approval routing";
-        return; // Don't redirect for this option
       default:
         return;
     }
@@ -101,7 +82,7 @@ export const ApprovalSection = ({
   };
 
   // Don't show approval section for approved documents
-  if (documentStatus === "approved") {
+  if (["Approved", "Rejected"].includes(documentStatus)) {
     return null;
   }
 
@@ -126,18 +107,13 @@ export const ApprovalSection = ({
           <SelectValue placeholder="Approve File" />
         </SelectTrigger>
         <SelectContent className="bg-white shadow-lg border border-gray-200 z-50">
-          {documentStatus === "pending" ? (
+          {documentStatus === "Pending" ? (
             // For pending documents, only show reject option
             <SelectItem value="reject" className="text-red-600">Reject file</SelectItem>
           ) : (
             // For processing/other statuses, show all options
             <>
-              <SelectItem value="move-next">Move to next file on approval</SelectItem>
-              <SelectItem value="view-routing">View approval routing</SelectItem>
-              <SelectItem value="move-prev">Move to prev stage</SelectItem>
               <SelectItem value="reject" className="text-red-600">Reject file</SelectItem>
-              <SelectItem value="reconciled">Reconciled</SelectItem>
-              <SelectItem value="not-reconciled">Not Reconciled</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
             </>
           )}
